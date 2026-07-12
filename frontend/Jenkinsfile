@@ -20,6 +20,7 @@ pipeline {
 
     environment {
         APP_NAME = "wanderlust-frontend"
+        SONAR_HOME = tool 'Sonar'
     }
 
     stages {
@@ -162,9 +163,29 @@ pipeline {
 
             }
 
-        }     
+        }
 
+        stage('Dependency Scan') {
 
+            when {
+                expression { buildRequired }
+            }
+
+            steps {
+
+                dir('frontend') {
+
+                    sh '''
+                        echo "Scanning dependencies for vulnerabilities..."
+
+                        trivy fs --scanners vuln --severity HIGH,CRITICAL --exit-code 1 package-lock.json
+                    '''
+
+                }
+
+            }
+
+        }
 
         stage('ESLint') {
 
@@ -181,6 +202,125 @@ pipeline {
 
                         npm run lint
                     '''
+
+                }
+
+            }
+
+        }
+
+        stage('Unit Test') {
+
+            when {
+                expression { buildRequired }
+            }
+
+            steps {
+
+                dir('frontend') {
+
+                    sh '''
+                        echo "Running Unit Tests..."
+
+                        npm test -- --ci --passWithNoTests
+                    '''
+
+                }
+
+            }
+
+        }
+
+        stage('Build') {
+
+            when {
+                expression { buildRequired }
+            }
+
+            steps {
+
+                dir('frontend') {
+
+                    sh '''
+                        echo "Building Frontend Application..."
+
+                        npm run build
+                    '''
+
+                }
+
+            }
+
+        }
+
+        stage('Dockerfile Lint') {
+
+            when {
+                expression { buildRequired }
+            }
+
+            steps {
+
+                dir('frontend') {
+
+                    sh '''
+                        echo "Scanning Dockerfile for misconfigurations..."
+
+                        trivy config --severity HIGH,CRITICAL --exit-code 1 Dockerfile
+                    '''
+
+                }
+
+            }
+
+        }
+
+        stage('SonarQube Scan') {
+
+            when {
+                expression { buildRequired }
+            }
+
+            steps {
+
+                dir('frontend') {
+
+                    withSonarQubeEnv('Sonar') {
+
+                        sh '''
+                            echo "Running SonarQube Analysis..."
+
+                            ${SONAR_HOME}/bin/sonar-scanner \
+                                -Dsonar.projectKey=wanderlust-frontend \
+                                -Dsonar.projectName=wanderlust-frontend \
+                                -Dsonar.sources=src \
+                                -Dsonar.exclusions=**/node_modules/**,**/dist/**,**/__tests__/**,**/config/jest/** \
+                                -Dsonar.tests=src/__tests__ \
+                                -Dsonar.test.inclusions=**/*.test.tsx,**/*.test.ts \
+                                -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
+                        '''
+
+                    }
+
+                }
+
+            }
+
+        }
+
+        stage('Quality Gate') {
+
+            when {
+                expression { buildRequired }
+            }
+
+            steps {
+
+                echo "Waiting for SonarQube Quality Gate..."
+
+                timeout(time: 5, unit: 'MINUTES') {
+
+                    waitForQualityGate abortPipeline: true
 
                 }
 
