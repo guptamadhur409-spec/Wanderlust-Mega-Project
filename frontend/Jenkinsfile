@@ -1,0 +1,226 @@
+pipeline {
+
+    agent {
+        label 'ubuntu'
+    }
+
+    options {
+        timestamps()
+        ansiColor('xterm')
+        disableConcurrentBuilds()
+        skipDefaultCheckout(true)
+
+        buildDiscarder(logRotator(
+            numToKeepStr: '20',
+            artifactNumToKeepStr: '10'
+        ))
+    }
+
+    environment {
+        APP_NAME = "wanderlust-frontend"
+        NODE_ENV = "production"
+    }
+
+    stages {
+
+        stage('Checkout') {
+            steps {
+
+                echo "Checking out source code..."
+
+                checkout scm
+
+                sh '''
+                    echo "Current Workspace"
+                    pwd
+
+                    echo "Repository Contents"
+                    ls -la
+
+                    echo "Frontend Directory"
+                    ls -la frontend
+                '''
+            }
+        }
+
+        stage('Verify Build Agent') {
+            steps {
+
+                sh '''
+                    echo "========= Installed Tools ========="
+
+                    git --version
+                    node --version
+                    npm --version
+                    docker --version
+                    kubectl version --client
+                    helm version
+                    az version
+                    java -version
+                    trivy --version
+                    sonar-scanner --version
+                '''
+            }
+        }
+
+        stage('Detect Frontend Changes') {
+
+            steps {
+
+                script {
+
+                    /*
+                     * Compare previous successful build with current commit.
+                     * First build fallback -> HEAD~1
+                     */
+
+                    def previousCommit = env.GIT_PREVIOUS_SUCCESSFUL_COMMIT
+
+                    def currentCommit = env.GIT_COMMIT
+
+                    def diffCommand
+
+                    if (previousCommit?.trim()) {
+                        diffCommand = "git diff --name-only ${previousCommit} ${currentCommit}"
+                    } else {
+                        diffCommand = "git diff --name-only HEAD~1 HEAD || true"
+                    }
+
+                    def changedFiles = sh(
+                        script: diffCommand,
+                        returnStdout: true
+                    ).trim().split('\n')
+
+                    echo "========== Changed Files =========="
+
+                    changedFiles.each {
+                        echo it
+                    }
+
+                    def triggerPatterns = [
+
+                        ~/^frontend\/src\/.*/,
+                        ~/^frontend\/public\/.*/,
+                        ~/^frontend\/package\.json$/,
+                        ~/^frontend\/package-lock\.json$/,
+                        ~/^frontend\/vite\.config\.ts$/,
+                        ~/^frontend\/tsconfig.*$/,
+                        ~/^frontend\/tailwind\.config\.js$/,
+                        ~/^frontend\/postcss\.config\.js$/,
+                        ~/^frontend\/components\.json$/,
+                        ~/^frontend\/index\.html$/,
+                        ~/^frontend\/Dockerfile$/,
+                        ~/^frontend\/\.env.*/
+                    ]
+
+                    def buildRequired = false
+
+                    for (file in changedFiles) {
+
+                        if (triggerPatterns.any { file ==~ it }) {
+
+                            buildRequired = true
+                            break
+
+                        }
+
+                    }
+
+                    if (!buildRequired) {
+
+                        currentBuild.result = 'NOT_BUILT'
+
+                        error("""
+No frontend application changes detected.
+
+Skipping Frontend Pipeline.
+""")
+
+                    }
+
+                    echo "Frontend changes detected."
+
+                }
+
+            }
+
+        }
+
+        stage('Install Dependencies') {
+
+            steps {
+
+                dir('frontend') {
+
+                    sh '''
+                        echo "Installing Node Packages..."
+                        npm ci
+                    '''
+
+                }
+
+            }
+
+        }
+
+        stage('Code Formatting Check') {
+
+            steps {
+
+                dir('frontend') {
+
+                    sh '''
+                        echo "Checking Formatting..."
+
+                        npx prettier --check .
+                    '''
+
+                }
+
+            }
+
+        }
+
+        stage('ESLint') {
+
+            steps {
+
+                dir('frontend') {
+
+                    sh '''
+                        echo "Running ESLint..."
+
+                        npm run lint
+                    '''
+
+                }
+
+            }
+
+        }
+
+    }
+
+    post {
+
+        success {
+
+            echo "Frontend CI completed successfully."
+
+        }
+
+        failure {
+
+            echo "Frontend CI failed."
+
+        }
+
+        always {
+
+            cleanWs()
+
+        }
+
+    }
+
+}
