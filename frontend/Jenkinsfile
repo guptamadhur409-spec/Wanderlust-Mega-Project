@@ -20,7 +20,6 @@ pipeline {
 
     environment {
         APP_NAME = "wanderlust-frontend"
-        NODE_ENV = "production"
     }
 
     stages {
