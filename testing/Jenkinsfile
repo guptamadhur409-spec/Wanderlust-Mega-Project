@@ -1,0 +1,45 @@
+pipeline {
+    agent { label "ubuntu" }
+
+    options {
+        timestamps()
+        ansiColor('xterm')
+        disableConcurrentBuilds()
+        buildDiscarder(logRotator(numToKeepStr: '20'))
+    }
+
+    stages {
+
+        stage('Checkout') {
+            steps {
+                echo 'Checking out source code...'
+                checkout scm
+            }
+        }
+
+        stage('Verify Agent') {
+            steps {
+                sh '''
+                echo "===== Tool Versions ====="
+                git --version
+                node --version
+                npm --version
+                docker --version
+                kubectl version --client
+                helm version
+                az version
+                java -version
+                trivy --version
+                sonar-scanner --version
+                '''
+            }
+        }
+
+    }
+
+    post {
+        always {
+            cleanWs()
+        }
+    }
+}
