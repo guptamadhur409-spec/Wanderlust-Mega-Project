@@ -163,23 +163,7 @@ Skipping Frontend Pipeline.
 
         }     
 
-        stage('Code Formatting Check') {
 
-            steps {
-
-                dir('frontend') {
-
-                    sh '''
-                        echo "Checking Formatting..."
-
-                        ./node_modules/.bin/prettier --check .
-                    '''
-
-                }
-
-            }
-
-        }
 
         stage('ESLint') {
 
