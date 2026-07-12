@@ -19,6 +19,7 @@ pipeline {
     environment {
         APP_NAME = "wanderlust-frontend"
         NODE_ENV = "production"
+        BUILD_REQUIRED = "false"
     }
 
     stages {
@@ -128,17 +129,16 @@ pipeline {
 
                     if (!buildRequired) {
 
+                        echo "No frontend application changes detected. Skipping pipeline."
                         currentBuild.result = 'NOT_BUILT'
+                        currentBuild.description = 'Skipped - no frontend code changes'
 
-                        error("""
-No frontend application changes detected.
+                    } else {
 
-Skipping Frontend Pipeline.
-""")
+                        env.BUILD_REQUIRED = "true"
+                        echo "Frontend changes detected."
 
                     }
-
-                    echo "Frontend changes detected."
 
                 }
 
@@ -147,6 +147,10 @@ Skipping Frontend Pipeline.
         }
 
         stage('Install Dependencies') {
+
+            when {
+                environment name: 'BUILD_REQUIRED', value: 'true'
+            }
 
             steps {
 
@@ -166,6 +170,10 @@ Skipping Frontend Pipeline.
 
 
         stage('ESLint') {
+
+            when {
+                environment name: 'BUILD_REQUIRED', value: 'true'
+            }
 
             steps {
 
