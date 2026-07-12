@@ -36,6 +36,7 @@ export default {
     '@/(.*)$': '<rootDir>/$1',
   },
   setupFilesAfterEnv: ['./config/jest/setup-tests.ts'],
+  setupFiles: ['./config/jest/polyfills.ts'],
   moduleFileExtensions: [
     // Place tsx and ts to beginning as suggestion from Jest team
     // https://jestjs.io/docs/configuration#modulefileextensions-arraystring
