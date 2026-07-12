@@ -162,6 +162,19 @@ Skipping Frontend Pipeline.
             }
 
         }
+        stage('Debug Node Modules') {
+            steps {
+                dir('frontend') {
+                    sh '''
+                        pwd
+                        ls -la
+                        ls node_modules | head
+                        npm list prettier
+                        npm list prettier-plugin-tailwindcss
+                    '''
+                }
+            }
+        }        
 
         stage('Code Formatting Check') {
 
@@ -172,7 +185,7 @@ Skipping Frontend Pipeline.
                     sh '''
                         echo "Checking Formatting..."
 
-                        npx prettier --check .
+                        npm run format:check
                     '''
 
                 }
