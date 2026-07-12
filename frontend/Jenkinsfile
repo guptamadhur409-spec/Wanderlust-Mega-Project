@@ -149,7 +149,7 @@ pipeline {
         stage('Install Dependencies') {
 
             when {
-                environment name: 'BUILD_REQUIRED', value: 'true'
+                expression { env.BUILD_REQUIRED == 'true' }
             }
 
             steps {
@@ -172,7 +172,7 @@ pipeline {
         stage('ESLint') {
 
             when {
-                environment name: 'BUILD_REQUIRED', value: 'true'
+                expression { env.BUILD_REQUIRED == 'true' }
             }
 
             steps {
