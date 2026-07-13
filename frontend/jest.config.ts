@@ -3,6 +3,7 @@ export default {
   preset: 'ts-jest',
   testEnvironment: 'jsdom',
   coverageProvider: 'v8',
+  coverageDirectory: '../coverage',
   transform: {
     '^.+\\.tsx?$': [
       'ts-jest',
