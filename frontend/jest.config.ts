@@ -2,6 +2,7 @@ export default {
   rootDir: 'src',
   preset: 'ts-jest',
   testEnvironment: 'jsdom',
+  coverageProvider: 'v8',
   transform: {
     '^.+\\.tsx?$': [
       'ts-jest',
