@@ -127,7 +127,12 @@ export function createPost(input: PostInput) {
 
 // Validate email
 export function validateEmail(email: string) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  if (!email || email.length > 254) return false;
+  const atIndex = email.indexOf('@');
+  if (atIndex < 1 || atIndex > 64) return false;
+  const domain = email.slice(atIndex + 1);
+  if (!domain || domain.length > 253 || !domain.includes('.')) return false;
+  return true;
 }
 
 // Check admin role

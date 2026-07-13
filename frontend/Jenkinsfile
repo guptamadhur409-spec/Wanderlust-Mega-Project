@@ -253,7 +253,7 @@ pipeline {
                     sh '''
                         echo "Running Unit Tests..."
 
-                        npm test -- --ci --passWithNoTests --testPathIgnorePatterns=integration
+                        npm test -- --ci --passWithNoTests --testPathIgnorePatterns=integration --coverage
                     '''
 
                 }
