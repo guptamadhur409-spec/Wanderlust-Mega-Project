@@ -324,7 +324,9 @@ pipeline {
                     int patch = parts[2] as Integer
 
 
-                    env.VERSION = "v${major}.${minor}.${patch}"
+                    env.VERSION = "${major}.${minor}.${patch}"
+
+                    env.GIT_TAG = "v${env.VERSION}"
 
                     env.IMAGE_TAG = "${ACR_REGISTRY}/${APP_NAME}:${env.VERSION}"
 
@@ -362,7 +364,10 @@ pipeline {
                     sh '''
                         echo "Building Docker image..."
 
-                        docker build -t ${IMAGE_TAG}:${env.VERSION} .
+                        echo "IMAGE_TAG=$IMAGE_TAG"
+                        echo "IMAGE_LATEST=$IMAGE_LATEST"
+
+                        docker build -t "$IMAGE_TAG" -t "$IMAGE_LATEST" .
                     '''
                 }
             }
