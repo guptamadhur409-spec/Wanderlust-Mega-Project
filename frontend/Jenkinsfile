@@ -20,6 +20,7 @@ pipeline {
 
     environment {
         APP_NAME = "wanderlust-frontend"
+        ACR_REGISTRY = "akstestingregistrymgre.azurecr.io"
         SONAR_HOME = tool 'Sonar'
     }
 
@@ -284,28 +285,6 @@ pipeline {
 
         }
 
-        stage('Dockerfile Lint') {
-
-            when {
-                expression { buildRequired }
-            }
-
-            steps {
-
-                dir('frontend') {
-
-                    sh '''
-                        echo "Scanning Dockerfile for misconfigurations..."
-
-                        trivy config --severity HIGH,CRITICAL --exit-code 1 Dockerfile
-                    '''
-
-                }
-
-            }
-
-        }
-
         stage('SonarQube Scan') {
 
             when {
@@ -352,6 +331,109 @@ pipeline {
                 timeout(time: 5, unit: 'MINUTES') {
 
                     waitForQualityGate abortPipeline: true
+
+                }
+
+            }
+
+        }
+
+        stage('Dockerfile Lint') {
+
+            when {
+                expression { buildRequired }
+            }
+
+            steps {
+
+                dir('frontend') {
+
+                    sh '''
+                        echo "Scanning Dockerfile for misconfigurations..."
+
+                        trivy config --severity HIGH,CRITICAL --exit-code 1 Dockerfile
+                    '''
+
+                }
+
+            }
+
+        }
+
+        stage('Docker Build') {
+
+            when {
+                expression { buildRequired }
+            }
+
+            steps {
+
+                dir('frontend') {
+
+                    sh '''
+                        echo "Building Docker image..."
+
+                        IMAGE_TAG=${ACR_REGISTRY}/${APP_NAME}:${BUILD_NUMBER}
+                        IMAGE_LATEST=${ACR_REGISTRY}/${APP_NAME}:latest
+
+                        docker build -t ${IMAGE_TAG} -t ${IMAGE_LATEST} .
+                    '''
+
+                }
+
+            }
+
+        }
+
+        stage('Docker Image Scan') {
+
+            when {
+                expression { buildRequired }
+            }
+
+            steps {
+
+                sh '''
+                    echo "Scanning Docker image for vulnerabilities..."
+
+                    IMAGE_TAG=${ACR_REGISTRY}/${APP_NAME}:${BUILD_NUMBER}
+                    trivy image --severity HIGH,CRITICAL --exit-code 1 ${IMAGE_TAG}
+                '''
+
+            }
+
+        }
+
+        stage('Push Image to ACR') {
+
+            when {
+                expression { buildRequired }
+            }
+
+            steps {
+
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'acr-credentials',
+                        usernameVariable: 'ACR_USERNAME',
+                        passwordVariable: 'ACR_PASSWORD'
+                    )
+                ]) {
+
+                    sh '''
+                        echo "Logging in to Azure Container Registry..."
+
+                        echo ${ACR_PASSWORD} | docker login ${ACR_REGISTRY} -u ${ACR_USERNAME} --password-stdin
+
+                        IMAGE_TAG=${ACR_REGISTRY}/${APP_NAME}:${BUILD_NUMBER}
+                        IMAGE_LATEST=${ACR_REGISTRY}/${APP_NAME}:latest
+
+                        echo "Pushing images to ACR..."
+                        docker push ${IMAGE_TAG}
+                        docker push ${IMAGE_LATEST}
+
+                        docker logout ${ACR_REGISTRY}
+                    '''
 
                 }
 
