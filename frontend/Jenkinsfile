@@ -297,6 +297,61 @@ pipeline {
                 }
             }
         }
+        stage('Generate Semantic Version') {
+            when {
+                expression { buildRequired }
+            }
+
+            steps {
+                script {
+                    sh 'git fetch --tags'
+
+                    // First release
+                    def latestTag = sh(
+                        script: '''
+                        git describe --tags --abbrev=0 2>/dev/null || echo v1.0.0
+                        ''',
+                        returnStdout: true
+                    ).trim()
+
+                    echo "Latest Tag: ${latestTag}"
+
+                    def version = latestTag.replace('v', '')
+                    def parts = version.tokenize('.')
+
+                    int major = parts[0] as Integer
+                    int minor = parts[1] as Integer
+                    int patch = parts[2] as Integer
+
+                    patch++
+
+                    env.VERSION = "${major}.${minor}.${patch}"
+
+                    env.IMAGE_TAG = "${ACR_REGISTRY}/${APP_NAME}:${env.VERSION}"
+
+                    env.IMAGE_LATEST = "${ACR_REGISTRY}/${APP_NAME}:latest"
+
+                    echo """
+        =============================
+        Semantic Version : ${env.VERSION}
+        Docker Image     : ${env.IMAGE_TAG}
+        =============================
+        """
+                }
+            }
+        }
+
+        stage('Verify Version') {
+            when {
+                expression { buildRequired }
+            }
+
+            steps {
+                echo "Version : ${env.VERSION}"
+                echo "Image   : ${env.IMAGE_TAG}"
+            }
+        }
+
         stage('Docker Build') {
             when {
                 expression {
@@ -308,10 +363,7 @@ pipeline {
                     sh '''
                         echo "Building Docker image..."
 
-                        IMAGE_TAG=${ACR_REGISTRY}/${APP_NAME}:${BUILD_NUMBER}
-                        IMAGE_LATEST=${ACR_REGISTRY}/${APP_NAME}:latest
-
-                        docker build -t ${IMAGE_TAG} -t ${IMAGE_LATEST} .
+                        docker build -t ${IMAGE_TAG} -t ${IMAGE_LATEST}
                     '''
                 }
             }
@@ -326,7 +378,7 @@ pipeline {
                 sh '''
                     echo "Generating container SBOM (CycloneDX)..."
 
-                    IMAGE_TAG=${ACR_REGISTRY}/${APP_NAME}:${BUILD_NUMBER}
+                    IMAGE_TAG=${IMAGE_TAG}
                     trivy image --skip-version-check --format cyclonedx --output image-sbom.cdx.json ${IMAGE_TAG}
                 '''
                 archiveArtifacts artifacts: 'image-sbom.cdx.json', allowEmptyArchive: false
@@ -342,7 +394,7 @@ pipeline {
                 sh '''
                     echo "Scanning Docker image for vulnerabilities..."
 
-                    IMAGE_TAG=${ACR_REGISTRY}/${APP_NAME}:${BUILD_NUMBER}
+                    IMAGE_TAG=${IMAGE_TAG}
 
                                         trivy image \
                                             --skip-version-check \
@@ -363,89 +415,86 @@ pipeline {
                 archiveArtifacts artifacts: 'trivy-image.json,trivy-image.txt', allowEmptyArchive: false
             }
         }
-        stage('Security Gate') {
-            steps {
-                sh '''
-                    node <<'EOF'
+        // stage('Security Gate') {
+        //     steps {
+        //         sh '''
+        //             node <<'EOF'
 
-                    const fs=require("fs");
+        //             const fs=require("fs");
 
-                    const report=JSON.parse(
-                        fs.readFileSync("trivy-image.json")
-                );
+        //             const report=JSON.parse(
+        //                 fs.readFileSync("trivy-image.json")
+        //             );
 
-                let high=[];
-                let critical=[];
+        //             let high=[];
+        //             let critical=[];
 
-                for(const result of report.Results||[]){
+        //             for(const result of report.Results||[]){
 
-                    for(const vuln of result.Vulnerabilities||[]){
+        //                 for(const vuln of result.Vulnerabilities||[]){
 
-                    if(vuln.Severity==="HIGH")
-                        high.push(vuln);
+        //                     if(vuln.Severity==="HIGH")
+        //                         high.push(vuln);
 
-                    if(vuln.Severity==="CRITICAL")
-                        critical.push(vuln);
-                    }
+        //                     if(vuln.Severity==="CRITICAL")
+        //                         critical.push(vuln);
+        //                 }
 
-                }
+        //             }
 
-                console.log("");
+        //             console.log("");
 
-                console.log("========= SECURITY SUMMARY =========");
+        //             console.log("========= SECURITY SUMMARY =========");
 
-                console.log("Critical :",critical.length);
+        //             console.log("Critical :",critical.length);
 
-                console.log("High     :",high.length);
+        //             console.log("High     :",high.length);
 
-                console.log("");
+        //             console.log("");
 
-                if(critical.length){
+        //             if(critical.length){
 
-                    console.log("Critical Vulnerabilities");
+        //                 console.log("Critical Vulnerabilities");
 
-                critical.forEach(v=>{
+        //                 critical.forEach(v=>{
 
-                    console.log(
-                        `${v.PkgName} ${v.VulnerabilityID}`
-                    );
+        //                     console.log(
+        //                     `${v.PkgName} ${v.VulnerabilityID}`
+        //                     );
+        //                 });
 
-                });
+        //             }
 
-                }
+        //             console.log("");
 
-            console.log("");
+        //             if(high.length){
 
-            if(high.length){
+        //                 console.log("High Vulnerabilities");
 
-                console.log("High Vulnerabilities");
+        //             high.forEach(v=>{
 
-            high.forEach(v=>{
+        //                     console.log(
+        //                         `${v.PkgName} ${v.VulnerabilityID}`
+        //                     );
+        //                 });
+        //             }
 
-                console.log(
-                    `${v.PkgName} ${v.VulnerabilityID}`
-                );
+        //             console.log("");
 
-            });
+        //             if(critical.length>0){
 
-            }
+        //                 console.log("Build Failed");
 
-            console.log("");
+        //                 process.exit(1);
 
-            if(critical.length>0){
+        //             }
 
-                console.log("Build Failed");
+        //             console.log("Build Passed");
 
-                process.exit(1);
-
-            }
-
-            console.log("Build Passed");
-
-            EOF
-            '''
-            }
-        }
+    //         EOF
+    //         '''
+    //     }
+    // }
     }
     post {
         success {

@@ -12,10 +12,9 @@ RUN npm install
 
 # Copy the rest of the application code
 COPY . .
-##
 # ------------------- Stage 2: Final Stage ------------------------------
 FROM node:22-bookworm-slim
-
+###
 # Set the working directory to /app
 WORKDIR /app
 
