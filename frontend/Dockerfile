@@ -16,7 +16,7 @@ COPY . .
 FROM node:22-bookworm-slim
 # Set the working directory to /app
 WORKDIR /app
-####
+
 
 # Copy built assets and dependencies from frontend-builder stage
 COPY --from=frontend-builder /app .
