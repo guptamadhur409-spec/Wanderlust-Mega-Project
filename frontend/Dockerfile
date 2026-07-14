@@ -14,7 +14,7 @@ RUN npm install
 COPY . .
 # ------------------- Stage 2: Final Stage ------------------------------
 FROM node:22-bookworm-slim
-###
+###understand why to use tag
 # Set the working directory to /app
 WORKDIR /app
 
