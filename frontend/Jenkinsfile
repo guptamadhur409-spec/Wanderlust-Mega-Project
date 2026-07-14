@@ -328,7 +328,7 @@ pipeline {
 
                     env.GIT_TAG = "v${env.VERSION}"
 
-                    env.IMAGE_TAG = "${ACR_REGISTRY}/${APP_NAME}:${env.VERSION}"
+                    env.IMAGE_TAG = "${ACR_REGISTRY}/${APP_NAME}:${env.GIT_TAG}"
 
                     env.IMAGE_LATEST = "${ACR_REGISTRY}/${APP_NAME}:latest"
 
@@ -348,7 +348,7 @@ pipeline {
             }
 
             steps {
-                echo "Version : ${env.VERSION}"
+                echo "Version : ${env.GIT_TAG}"
                 echo "Image   : ${env.IMAGE_TAG}"
             }
         }
