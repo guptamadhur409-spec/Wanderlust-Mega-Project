@@ -1,38 +1,29 @@
 def buildRequired = false
 
 pipeline {
-
     agent {
         label 'ubuntu'
     }
-
     options {
         timestamps()
         ansiColor('xterm')
         disableConcurrentBuilds()
         skipDefaultCheckout(true)
-
         buildDiscarder(logRotator(
             numToKeepStr: '20',
             artifactNumToKeepStr: '10'
         ))
     }
-
     environment {
-        APP_NAME = "wanderlust-frontend"
-        ACR_REGISTRY = "akstestingregistrymgre.azurecr.io"
+        APP_NAME = 'wanderlust-frontend'
+        ACR_REGISTRY = 'akstestingregistrymgre.azurecr.io'
         SONAR_HOME = tool 'Sonar'
     }
-
     stages {
-
         stage('Checkout') {
             steps {
-
-                echo "Checking out source code..."
-
+                echo 'Checking out source code...'
                 checkout scm
-
                 sh '''
                     echo "Current Workspace"
                     pwd
@@ -45,10 +36,8 @@ pipeline {
                 '''
             }
         }
-
         stage('Verify Build Agent') {
             steps {
-
                 sh '''
                     echo "========= Installed Tools ========="
 
@@ -66,11 +55,8 @@ pipeline {
                 '''
             }
         }
-
         stage('Secret Scan') {
-
             steps {
-
                 sh '''
                     echo "Scanning git history for secrets with TruffleHog..."
                     echo "TruffleHog version:"
@@ -92,121 +78,86 @@ pipeline {
                         echo "No secrets found in git history."
                     fi
                 '''
-
             }
-
         }
-
         stage('Detect Frontend Changes') {
-
             steps {
-
                 script {
-
                     /*
                      * Compare previous successful build with current commit.
                      * First build fallback -> HEAD~1
                      */
-
                     def previousCommit = env.GIT_PREVIOUS_SUCCESSFUL_COMMIT
-
                     def currentCommit = env.GIT_COMMIT
-
                     def diffCommand
-
                     if (previousCommit?.trim()) {
                         diffCommand = "git diff --name-only ${previousCommit} ${currentCommit}"
                     } else {
-                        diffCommand = "git diff --name-only HEAD~1 HEAD || true"
+                        diffCommand = 'git diff --name-only HEAD~1 HEAD || true'
                     }
-
                     def changedFiles = sh(
                         script: diffCommand,
                         returnStdout: true
                     ).trim().split('\n')
-
-                    echo "========== Changed Files =========="
-
+                    echo '========== Changed Files =========='
                     changedFiles.each {
                         echo it
                     }
-
                     def triggerPatterns = [
-
-                        ~/^frontend\/src\/.*/,
-                        ~/^frontend\/public\/.*/,
-                        ~/^frontend\/package\.json$/,
-                        ~/^frontend\/package-lock\.json$/,
-                        ~/^frontend\/vite\.config\.ts$/,
-                        ~/^frontend\/tsconfig.*$/,
-                        ~/^frontend\/tailwind\.config\.js$/,
-                        ~/^frontend\/postcss\.config\.js$/,
-                        ~/^frontend\/components\.json$/,
-                        ~/^frontend\/index\.html$/,
-                        ~/^frontend\/Dockerfile$/,
-                        ~/^frontend\/\.env.*/
+                        ~ /^frontend\/src\/.*/,
+ ~ /^frontend\/ public \/.*/,
+ ~ /^frontend\/ package \.json$/,
+                        ~/ ^ frontend\/package-lock\.json$/,
+ ~ /^frontend\/vite\.config\.ts$/,
+                        ~/ ^ frontend\/tsconfig.*$/,
+ ~ /^frontend\/tailwind\.config\.js$/,
+                        ~/ ^ frontend\/postcss\.config\.js$/,
+ ~ /^frontend\/components\.json$/,
+                        ~/ ^ frontend\/index\.html$/,
+ ~ /^frontend\/Dockerfile$/,
+                        ~/ ^ frontend\/\.env.*/
                     ]
-
                     for (file in changedFiles) {
-
-                        if (triggerPatterns.any { file ==~ it }) {
-
+                        if (triggerPatterns.any {
+                            file ==~ it
+                        }) {
                             buildRequired = true
                             break
-
                         }
-
                     }
-
                     if (!buildRequired) {
-
-                        echo "No frontend application changes detected. Skipping pipeline."
+                        echo 'No frontend application changes detected. Skipping pipeline.'
                         currentBuild.result = 'NOT_BUILT'
                         currentBuild.description = 'Skipped - no frontend code changes'
-
                     } else {
-
-                        echo "Frontend changes detected."
-
+                        echo 'Frontend changes detected.'
                     }
-
                 }
-
             }
-
         }
-
         stage('Install Dependencies') {
-
             when {
-                expression { buildRequired }
+                expression {
+                    buildRequired
+                }
             }
-
             steps {
-
                 dir('frontend') {
-
                     sh '''
                         echo "Installing Node Packages..."
                         npm ci
                     '''
-
                 }
-
             }
-
         }
-
         stage('Dependency Scan') {
-
             when {
-                expression { buildRequired }
+                expression {
+                    buildRequired
+                }
             }
-
             steps {
-
                 dir('frontend') {
-
                     sh '''
                         echo "Scanning dependencies for vulnerabilities..."
 
@@ -240,93 +191,67 @@ pipeline {
                             exit 1
                         fi
                     '''
-
                 }
-
                 archiveArtifacts artifacts: 'frontend/trivy-fs.json,frontend/trivy-fs.txt,frontend/npm-audit.json', allowEmptyArchive: true
-
             }
-
         }
-
         stage('ESLint') {
-
             when {
-                expression { buildRequired }
+                expression {
+                    buildRequired
+                }
             }
-
             steps {
-
                 dir('frontend') {
-
                     sh '''
                         echo "Running ESLint..."
 
                         npm run lint
                     '''
-
                 }
-
             }
-
         }
-
         stage('Unit Test') {
-
             when {
-                expression { buildRequired }
+                expression {
+                    buildRequired
+                }
             }
-
             steps {
-
                 dir('frontend') {
-
                     sh '''
                         echo "Running Unit Tests..."
 
                         npm test -- --ci --passWithNoTests --testPathIgnorePatterns=integration --coverage
                     '''
-
                 }
-
             }
-
         }
-
         stage('Build') {
-
             when {
-                expression { buildRequired }
+                expression {
+                    buildRequired
+                }
             }
-
             steps {
-
                 dir('frontend') {
-
                     sh '''
                         echo "Building Frontend Application..."
 
                         npm run build
                     '''
-
                 }
-
             }
-
         }
-
         stage('SonarQube Scan') {
-
             when {
-                expression { buildRequired }
+                expression {
+                    buildRequired
+                }
             }
-
             steps {
-
                 dir('frontend') {
-
                     withSonarQubeEnv('Sonar') {
-
                         sh '''
                             echo "Running SonarQube Analysis..."
 
@@ -339,67 +264,47 @@ pipeline {
                                 -Dsonar.test.inclusions=**/*.test.tsx,**/*.test.ts \
                                 -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
                         '''
-
                     }
-
                 }
-
             }
-
         }
-
         stage('Quality Gate') {
-
             when {
-                expression { buildRequired }
-            }
-
-            steps {
-
-                echo "Waiting for SonarQube Quality Gate..."
-
-                timeout(time: 5, unit: 'MINUTES') {
-
-                    waitForQualityGate abortPipeline: true
-
+                expression {
+                    buildRequired
                 }
-
             }
-
-        }
-
-        stage('Dockerfile Lint') {
-
-            when {
-                expression { buildRequired }
-            }
-
             steps {
-
+                echo 'Waiting for SonarQube Quality Gate...'
+                timeout(time: 5, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
+                }
+            }
+        }
+        stage('Dockerfile Lint') {
+            when {
+                expression {
+                    buildRequired
+                }
+            }
+            steps {
                 dir('frontend') {
-
                     sh '''
                         echo "Scanning Dockerfile for misconfigurations..."
 
                         trivy config --severity HIGH,CRITICAL --exit-code 1 Dockerfile
                     '''
-
                 }
-
             }
-
         }
-
         stage('Docker Build') {
-
             when {
-                expression { buildRequired }
+                expression {
+                    buildRequired
+                }
             }
-
             steps {
-
                 dir('frontend') {
-
                     sh '''
                         echo "Building Docker image..."
 
@@ -408,42 +313,32 @@ pipeline {
 
                         docker build -t ${IMAGE_TAG} -t ${IMAGE_LATEST} .
                     '''
-
                 }
-
             }
-
         }
-
         stage('SBOM Generate') {
-
             when {
-                expression { buildRequired }
+                expression {
+                    buildRequired
+                }
             }
-
             steps {
-
                 sh '''
                     echo "Generating container SBOM (CycloneDX)..."
 
                     IMAGE_TAG=${ACR_REGISTRY}/${APP_NAME}:${BUILD_NUMBER}
                     trivy image --skip-version-check --format cyclonedx --output image-sbom.cdx.json ${IMAGE_TAG}
                 '''
-
                 archiveArtifacts artifacts: 'image-sbom.cdx.json', allowEmptyArchive: false
-
             }
-
         }
-
         stage('Docker Image Scan') {
-
             when {
-                expression { buildRequired }
+                expression {
+                    buildRequired
+                }
             }
-
             steps {
-
                 sh '''
                     echo "Scanning Docker image for vulnerabilities..."
 
@@ -464,38 +359,103 @@ pipeline {
                                         --format table \
                                         ${IMAGE_TAG} | tee trivy-image.txt
 
-                                        echo "Trivy image severity summary (HIGH/CRITICAL):"
-                                        node -e "const fs=require('fs');const r=JSON.parse(fs.readFileSync('trivy-image.json','utf8'));let high=0,critical=0;for(const res of (r.Results||[])){for(const v of (res.Vulnerabilities||[])){if(v.Severity==='HIGH')high++;if(v.Severity==='CRITICAL')critical++;}}console.log('HIGH='+high+' CRITICAL='+critical);if(high+critical>0){process.exit(1);}"
-                '''
+                                        archiveArtifacts artifacts: 'trivy-image.json,trivy-image.txt'
+                                    '''
+            }
+        }
+        stage('Security Gate') {
+            steps {
+                sh '''
+                    node <<'EOF'
 
-                                archiveArtifacts artifacts: 'trivy-image.json,trivy-image.txt', allowEmptyArchive: false
+                    const fs=require("fs");
+
+                    const report=JSON.parse(
+                        fs.readFileSync("trivy-image.json")
+                );
+
+                let high=[];
+                let critical=[];
+
+                for(const result of report.Results||[]){
+
+                    for(const vuln of result.Vulnerabilities||[]){
+
+                    if(vuln.Severity==="HIGH")
+                        high.push(vuln);
+
+                    if(vuln.Severity==="CRITICAL")
+                        critical.push(vuln);
+                    }
+
+                }
+
+                console.log("");
+
+                console.log("========= SECURITY SUMMARY =========");
+
+                console.log("Critical :",critical.length);
+
+                console.log("High     :",high.length);
+
+                console.log("");
+
+                if(critical.length){
+
+                    console.log("Critical Vulnerabilities");
+
+                critical.forEach(v=>{
+
+                    console.log(
+                        `${v.PkgName} ${v.VulnerabilityID}`
+                    );
+
+                });
 
             }
 
+            console.log("");
+
+            if(high.length){
+
+                console.log("High Vulnerabilities");
+
+            high.forEach(v=>{
+
+                console.log(
+                    `${v.PkgName} ${v.VulnerabilityID}`
+                );
+
+            });
+
         }
 
-    }
+            console.log("");
 
+            if(critical.length>0){
+
+                console.log("Build Failed");
+
+                process.exit(1);
+
+            }
+
+            console.log("Build Passed");
+
+            EOF
+            '''
+            }
+        }
+    }
     post {
-
         success {
-
-            echo "Frontend CI completed successfully."
-
+            echo 'Frontend CI completed successfully.'
         }
-
         failure {
-
-            echo "Frontend CI failed."
-
+            echo 'Frontend CI failed.'
         }
-
         always {
-
             cleanWs()
-
         }
-
     }
-
 }
