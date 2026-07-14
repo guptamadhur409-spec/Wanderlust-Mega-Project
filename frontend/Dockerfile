@@ -1,5 +1,5 @@
 # ------------------- Stage 1: Build Stage ------------------------------
-FROM node:21 AS frontend-builder
+FROM node:22-bookworm-slim AS frontend-builder
 
 # Set the working directory to /app
 WORKDIR /app
@@ -14,7 +14,7 @@ RUN npm install
 COPY . .
 #####
 # ------------------- Stage 2: Final Stage ------------------------------
-FROM node:21-slim
+FROM node:22-bookworm-slim
 
 # Set the working directory to /app
 WORKDIR /app

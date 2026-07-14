@@ -458,11 +458,11 @@ pipeline {
                                             ${IMAGE_TAG}
 
                                         trivy image \
-                                            --skip-version-check \
-                                            --severity HIGH,CRITICAL \
-                                            --ignore-unfixed \
-                                            --format table \
-                                            ${IMAGE_TAG} > trivy-image.txt
+                                        --skip-version-check \
+                                        --severity HIGH,CRITICAL \
+                                        --ignore-unfixed \
+                                        --format table \
+                                        ${IMAGE_TAG} | tee trivy-image.txt
 
                                         echo "Trivy image severity summary (HIGH/CRITICAL):"
                                         node -e "const fs=require('fs');const r=JSON.parse(fs.readFileSync('trivy-image.json','utf8'));let high=0,critical=0;for(const res of (r.Results||[])){for(const v of (res.Vulnerabilities||[])){if(v.Severity==='HIGH')high++;if(v.Severity==='CRITICAL')critical++;}}console.log('HIGH='+high+' CRITICAL='+critical);if(high+critical>0){process.exit(1);}"
