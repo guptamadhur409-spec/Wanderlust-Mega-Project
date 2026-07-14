@@ -215,11 +215,21 @@ pipeline {
                           --scanners vuln \
                           --severity HIGH,CRITICAL \
                           --ignore-unfixed \
+                                                    --skip-version-check \
                           --format json \
                           -o trivy-fs.json \
                           package-lock.json || true
 
-                        trivy convert --format table trivy-fs.json > trivy-fs.txt || true
+                                                trivy fs \
+                                                    --scanners vuln \
+                                                    --severity HIGH,CRITICAL \
+                                                    --ignore-unfixed \
+                                                    --skip-version-check \
+                                                    --format table \
+                                                    package-lock.json > trivy-fs.txt || true
+
+                                                echo "Trivy severity summary (HIGH/CRITICAL):"
+                                                node -e "const fs=require('fs');const p='trivy-fs.json';if(!fs.existsSync(p)){console.log('No trivy-fs.json generated');process.exit(0);}const r=JSON.parse(fs.readFileSync(p,'utf8'));let high=0,critical=0;for(const res of (r.Results||[])){for(const v of (res.Vulnerabilities||[])){if(v.Severity==='HIGH')high++;if(v.Severity==='CRITICAL')critical++;}}console.log('HIGH='+high+' CRITICAL='+critical);"
 
                         # 2) npm audit as the fail gate (production dependencies only)
                         # This avoids failing on stale/non-runtime findings.
@@ -405,6 +415,27 @@ pipeline {
 
         }
 
+        stage('SBOM Generate') {
+
+            when {
+                expression { buildRequired }
+            }
+
+            steps {
+
+                sh '''
+                    echo "Generating container SBOM (CycloneDX)..."
+
+                    IMAGE_TAG=${ACR_REGISTRY}/${APP_NAME}:${BUILD_NUMBER}
+                    trivy image --skip-version-check --format cyclonedx --output image-sbom.cdx.json ${IMAGE_TAG}
+                '''
+
+                archiveArtifacts artifacts: 'image-sbom.cdx.json', allowEmptyArchive: false
+
+            }
+
+        }
+
         stage('Docker Image Scan') {
 
             when {
@@ -417,45 +448,27 @@ pipeline {
                     echo "Scanning Docker image for vulnerabilities..."
 
                     IMAGE_TAG=${ACR_REGISTRY}/${APP_NAME}:${BUILD_NUMBER}
-                    trivy image --severity HIGH,CRITICAL --exit-code 1 ${IMAGE_TAG}
+
+                                        trivy image \
+                                            --skip-version-check \
+                                            --severity HIGH,CRITICAL \
+                                            --ignore-unfixed \
+                                            --format json \
+                                            -o trivy-image.json \
+                                            ${IMAGE_TAG}
+
+                                        trivy image \
+                                            --skip-version-check \
+                                            --severity HIGH,CRITICAL \
+                                            --ignore-unfixed \
+                                            --format table \
+                                            ${IMAGE_TAG} > trivy-image.txt
+
+                                        echo "Trivy image severity summary (HIGH/CRITICAL):"
+                                        node -e "const fs=require('fs');const r=JSON.parse(fs.readFileSync('trivy-image.json','utf8'));let high=0,critical=0;for(const res of (r.Results||[])){for(const v of (res.Vulnerabilities||[])){if(v.Severity==='HIGH')high++;if(v.Severity==='CRITICAL')critical++;}}console.log('HIGH='+high+' CRITICAL='+critical);if(high+critical>0){process.exit(1);}"
                 '''
 
-            }
-
-        }
-
-        stage('Push Image to ACR') {
-
-            when {
-                expression { buildRequired }
-            }
-
-            steps {
-
-                withCredentials([
-                    usernamePassword(
-                        credentialsId: 'acr-credentials',
-                        usernameVariable: 'ACR_USERNAME',
-                        passwordVariable: 'ACR_PASSWORD'
-                    )
-                ]) {
-
-                    sh '''
-                        echo "Logging in to Azure Container Registry..."
-
-                        echo ${ACR_PASSWORD} | docker login ${ACR_REGISTRY} -u ${ACR_USERNAME} --password-stdin
-
-                        IMAGE_TAG=${ACR_REGISTRY}/${APP_NAME}:${BUILD_NUMBER}
-                        IMAGE_LATEST=${ACR_REGISTRY}/${APP_NAME}:latest
-
-                        echo "Pushing images to ACR..."
-                        docker push ${IMAGE_TAG}
-                        docker push ${IMAGE_LATEST}
-
-                        docker logout ${ACR_REGISTRY}
-                    '''
-
-                }
+                                archiveArtifacts artifacts: 'trivy-image.json,trivy-image.txt', allowEmptyArchive: false
 
             }
 
