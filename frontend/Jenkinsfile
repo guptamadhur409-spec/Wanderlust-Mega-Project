@@ -16,7 +16,7 @@ pipeline {
     }
     environment {
         APP_NAME = 'wanderlust-frontend'
-        ACR_REGISTRY = 'akstestingregistrymgre.azurecr.io'
+        ACR_REGISTRY = 'akstestingtrialcrrt.azurecr.io'
         SONAR_HOME = tool 'Sonar'
     }
     stages {
@@ -323,7 +323,6 @@ pipeline {
                     int minor = parts[1] as Integer
                     int patch = parts[2] as Integer
 
-
                     env.VERSION = "${major}.${minor}.${patch}"
 
                     env.GIT_TAG = "v${env.VERSION}"
@@ -417,6 +416,30 @@ pipeline {
 
                                     '''
                 archiveArtifacts artifacts: 'trivy-image.json,trivy-image.txt', allowEmptyArchive: false
+            }
+        }
+        stage('ACR Login') {
+            when {
+                expression { buildRequired }
+            }
+            steps {
+                sh '''
+                    az acr login \
+                        --name akstestingtrialcrrt
+                '''
+            }
+        }
+        stage('Push Image to ACR') {
+            when {
+                expression { buildRequired }
+            }
+
+            steps {
+                sh '''
+                    docker push ${IMAGE_TAG}
+
+                    docker push ${IMAGE_LATEST}
+                '''
             }
         }
         // stage('Security Gate') {
