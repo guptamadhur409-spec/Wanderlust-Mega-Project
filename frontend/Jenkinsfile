@@ -323,7 +323,6 @@ pipeline {
                     int minor = parts[1] as Integer
                     int patch = parts[2] as Integer
 
-                    patch++
 
                     env.VERSION = "${major}.${minor}.${patch}"
 
@@ -363,7 +362,7 @@ pipeline {
                     sh '''
                         echo "Building Docker image..."
 
-                        docker build -t ${IMAGE_TAG} -t ${IMAGE_LATEST}
+                        docker build -t ${IMAGE_TAG}
                     '''
                 }
             }
