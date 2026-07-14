@@ -424,6 +424,7 @@ pipeline {
             }
             steps {
                 sh '''
+                    az account set --subscription "44739cec-5ee1-4e4c-a34b-f1ae2c19b34d"
                     az acr login \
                         --name akstestingtrialcrrt
                 '''
