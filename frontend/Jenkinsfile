@@ -359,8 +359,8 @@ pipeline {
                                         --format table \
                                         ${IMAGE_TAG} | tee trivy-image.txt
 
-                                        archiveArtifacts artifacts: 'trivy-image.json,trivy-image.txt'
                                     '''
+                archiveArtifacts artifacts: 'trivy-image.json,trivy-image.txt', allowEmptyArchive: false
             }
         }
         stage('Security Gate') {
@@ -412,7 +412,7 @@ pipeline {
 
                 });
 
-            }
+                }
 
             console.log("");
 
@@ -428,7 +428,7 @@ pipeline {
 
             });
 
-        }
+            }
 
             console.log("");
 
